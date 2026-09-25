@@ -1,11 +1,8 @@
-
-
 from src.graph.state import CRAGState
 from src.graph import config
 
 
 def _get_groq_model(model_name: str, temperature: float = 0):
-   
     import os
     from langchain_openai import ChatOpenAI
 
@@ -37,7 +34,6 @@ def _groq_retry():
 
 
 def _extract_text(content) -> str:
-    
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -95,7 +91,6 @@ def retrieve(state: CRAGState) -> dict:
     print("[NODE] retrieve")
 
     model = _get_embedder()
-   
     collection = _get_collection(state.get("collection_name"))
 
     prefixed_question = config.QUERY_PREFIX + state["question"]
@@ -108,7 +103,7 @@ def retrieve(state: CRAGState) -> dict:
         docs.append({
             "content": doc,
             "metadata": meta,
-            "grade": None,       # not graded yet -- that's Checkpoint 3
+            "grade": None,
             "reasoning": None,
         })
 
@@ -118,19 +113,19 @@ def retrieve(state: CRAGState) -> dict:
 def grade_documents(state: CRAGState) -> dict:
     print("[NODE] grade_documents")
 
-    from pydantic import BaseModel
-    from typing import Literal
+    from pydantic import BaseModel, Field
+    from typing import Literal, List
     import openai
 
     class SingleGrade(BaseModel):
-        chunk_number: int
-        relevance: Literal["relevant", "irrelevant"]
-        reasoning: str
+        chunk_number: int = Field(description="The number of the chunk being graded (starting at 1)")
+        relevance: Literal["relevant", "irrelevant"] = Field(description="Topical relevance of this chunk")
+        reasoning: str = Field(description="Reasoning for the relevance grade")
 
     class BatchGrade(BaseModel):
-       
-        fully_covers_question: bool
-        coverage_reasoning: str
+        grades: List[SingleGrade] = Field(description="List of grades for each individual retrieved chunk")
+        fully_covers_question: bool = Field(description="True if the chunks together cover every part of the user question")
+        coverage_reasoning: str = Field(description="Reasoning regarding full context coverage")
 
     global _grading_model
     if "_grading_model" not in globals() or _grading_model is None:
@@ -208,7 +203,6 @@ then give your overall fully_covers_question judgment."""
     print(f"    coverage check: fully_covers_question={result.fully_covers_question} "
           f"({result.coverage_reasoning[:100]}...)")
 
-   
     grade_values = [d["grade"] for d in graded]
     
     relevant_ratio = 0.0
@@ -288,7 +282,7 @@ def web_search(state: CRAGState) -> dict:
         web_docs.append({
             "content": r.get("content", ""),
             "metadata": {
-                "source_paper": None,       # not from the corpus -- web result
+                "source_paper": None,
                 "section_name": r.get("title", "Web result"),
                 "content_type": "web",
                 "url": r.get("url"),
@@ -349,7 +343,6 @@ def generate(state: CRAGState) -> dict:
         
     context_text = "\n\n".join(context_blocks)
 
-    # 2. State-of-the-art Prompt with Footer Citation Rules
     prompt = f"""You are an expert research assistant. Your task is to provide a comprehensive, cohesive, and well-structured answer to the user's question based strictly on the provided context documents.
 
 INSTRUCTIONS:
